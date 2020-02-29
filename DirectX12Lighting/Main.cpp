@@ -32,7 +32,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
 	HWND hwnd = CreateWindowEx(
 		0,
 		WND_CLASS_NAME,
-		TEXT("DirectX 12 Textures"),
+		TEXT("DirectX 12 Lighting"),
 		WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT,	// x
 		CW_USEDEFAULT,	// y
