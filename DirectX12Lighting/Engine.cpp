@@ -229,10 +229,11 @@ void Engine::LoadTextures()
 		exit(-1);
 	}
 
-	m_textureData = new BYTE[textureSize];
+	m_textureData = std::make_unique<BYTE[]>(textureSize);
 
-	UINT bytesPerRow = textureWidth * 4;
-	hr = frame->CopyPixels(nullptr, bytesPerRow, textureSize, m_textureData);
+	const UINT bytesPerPixel = 4;
+	UINT bytesPerRow = textureWidth * bytesPerPixel;
+	hr = frame->CopyPixels(nullptr, bytesPerRow, textureSize, m_textureData.get());
 
 	if (FAILED(hr))
 	{
@@ -312,7 +313,7 @@ void Engine::LoadTextures()
 
 	// store texture in upload heap
 	D3D12_SUBRESOURCE_DATA textureSubresource = {};
-	textureSubresource.pData = m_textureData;
+	textureSubresource.pData = m_textureData.get();
 	textureSubresource.RowPitch = bytesPerRow;
 	textureSubresource.SlicePitch = bytesPerRow * textureHeight;
 
@@ -666,14 +667,13 @@ void Engine::CreateConstantBuffers()
 void Engine::InitWvp()
 {
 	// world
-
 	m_scale = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.0f);
-	m_position = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
-	m_rotation = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+	m_positionVec = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+	m_rotationVec = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
 
 	XMVECTOR scale = XMLoadFloat4(&m_scale);
-	XMVECTOR position = XMLoadFloat4(&m_position);
-	XMVECTOR rotation = XMLoadFloat4(&m_rotation);
+	XMVECTOR position = XMLoadFloat4(&m_positionVec);
+	XMVECTOR rotation = XMLoadFloat4(&m_rotationVec);
 
 	XMMATRIX scaleMat = XMMatrixScalingFromVector(scale);
 	XMMATRIX positionMat = XMMatrixTranslationFromVector(position);
@@ -684,32 +684,18 @@ void Engine::InitWvp()
 	XMStoreFloat4x4(&m_worldMat, worldMat);
 
 	// view
-
-	m_cameraPosition = XMFLOAT4(0.0f, 0.0f, -3.0f, 0.0f);
-	m_cameraRotation = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
-
-	m_viewMat._11 = 1.0f;	m_viewMat._12 = 0.0f;	m_viewMat._13 = 0.0f;	m_viewMat._14 = 0.0f;
-	m_viewMat._21 = 0.0f;	m_viewMat._22 = 1.0f;	m_viewMat._23 = 0.0f;	m_viewMat._24 = 0.0f;
-	m_viewMat._31 = 0.0f;	m_viewMat._32 = 0.0f;	m_viewMat._33 = 1.0f;	m_viewMat._34 = 0.0f;
-
-	m_viewMat._41 = -m_cameraPosition.x;	
-	m_viewMat._42 = -m_cameraPosition.y;
-	m_viewMat._43 = -m_cameraPosition.z;
-	m_viewMat._44 = 1.0f;
-
-	XMMATRIX viewMat = XMLoadFloat4x4(&m_viewMat);
+	const XMFLOAT4 cameraPosition = XMFLOAT4(0.0f, 0.0f, -3.0f, 0.0f);
+	m_camera.SetPosition(&cameraPosition);
 
 	// projection
-
 	const float fov = 60.0f * (XM_PI / 180.0f);
-	const float aspectRatio = static_cast<float>(m_resolutionWidth) / static_cast<float>(m_resolutionHeight);
-	XMMATRIX projectionMat = XMMatrixPerspectiveFovLH(fov, aspectRatio, 0.01f, 1000.0f);
+	m_camera.SetFov(fov);
 
-	XMStoreFloat4x4(&m_projectionMat, projectionMat);
+	const float aspectRatio = static_cast<float>(m_resolutionWidth) / static_cast<float>(m_resolutionHeight);
+	m_camera.SetAspectRatio(aspectRatio);
 
 	// World-View-Projection matrix
-
-	XMMATRIX wvpMat = worldMat * viewMat * projectionMat;
+	XMMATRIX wvpMat = worldMat * m_camera.GetViewProjectionMat();
 	XMMATRIX wvpTransposedMat = XMMatrixTranspose(wvpMat);
 
 	XMStoreFloat4x4(&m_wvpData.wvp, wvpTransposedMat);
@@ -719,93 +705,40 @@ void Engine::UpdateWvp(float deltaSec)
 {
 	const float movementSpeed = 1.0f;
 	const float rotationSpeed = 0.005f;
+	const SHORT keyStatePressedFlag = 0x800;
 	bool viewHasChanged = false;
 
-	XMVECTOR cameraRotationVec = XMLoadFloat4(&m_cameraRotation);
-	XMMATRIX cameraRotationMat = XMMatrixRotationRollPitchYawFromVector(cameraRotationVec);
-
-	XMFLOAT4 forwardVecFlt(0.0f, 0.0f, 1.0f, 0.0f);
-	XMVECTOR forwardVec = XMLoadFloat4(&forwardVecFlt);
-	forwardVec = XMVector4Transform(forwardVec, cameraRotationMat);
-
-	XMFLOAT4 rightVecFlt(1.0f, 0.0f, 0.0f, 0.0f);
-	XMVECTOR rightVec = XMLoadFloat4(&rightVecFlt);
-	rightVec = XMVector4Transform(rightVec, cameraRotationMat);
-
-	XMVECTOR cameraPositionVec = XMLoadFloat4(&m_cameraPosition);
-
-	if (GetKeyState(((int) 'W')) & 0x800)
+	if (GetKeyState(((int) 'W')) & keyStatePressedFlag)
 	{
-		//m_cameraPosition.z += movementSpeed * deltaSec;
-		cameraPositionVec += forwardVec * movementSpeed * deltaSec;
-		viewHasChanged = true;
+		m_camera.MoveForward(movementSpeed * deltaSec);
 	}
 
-	if (GetKeyState(((int) 'S')) & 0x800)
+	if (GetKeyState(((int) 'S')) & keyStatePressedFlag)
 	{
-		//m_cameraPosition.z -= movementSpeed * deltaSec;
-		cameraPositionVec -= forwardVec * movementSpeed * deltaSec;
-		viewHasChanged = true;
+		m_camera.MoveForward(-movementSpeed * deltaSec);
 	}
 
-	if (GetKeyState(((int) 'A')) & 0x800)
+	if (GetKeyState(((int) 'A')) & keyStatePressedFlag)
 	{
-		//m_cameraPosition.x -= movementSpeed * deltaSec;
-		cameraPositionVec -= rightVec * movementSpeed * deltaSec;
-		viewHasChanged = true;
+		m_camera.MoveRight(-movementSpeed * deltaSec);
 	}
 
-	if (GetKeyState(((int) 'D'))  & 0x800)
+	if (GetKeyState(((int) 'D')) & keyStatePressedFlag)
 	{
-		//m_cameraPosition.x += movementSpeed * deltaSec;
-		cameraPositionVec += rightVec * movementSpeed * deltaSec;
-		viewHasChanged = true;
-	}
-
-	if (viewHasChanged)
-	{
-		XMStoreFloat4(&m_cameraPosition, cameraPositionVec);
+		m_camera.MoveRight(movementSpeed * deltaSec);
 	}
 
 	if (m_mouseDeltaX != 0.0f || m_mouseDeltaY != 0.0f)
 	{
-		m_cameraRotation.y += rotationSpeed * m_mouseDeltaX;
-		m_cameraRotation.x += rotationSpeed * m_mouseDeltaY;
-		if (m_cameraRotation.x < -XM_PIDIV2)
-		{
-			m_cameraRotation.x = -XM_PIDIV2;
-		}
-		else if (m_cameraRotation.x > XM_PIDIV2)
-		{
-			m_cameraRotation.x = XM_PIDIV2;
-		}
-
-		XMVECTOR cameraRotation = XMLoadFloat4(&m_cameraRotation);
-		cameraRotation = XMVectorModAngles(cameraRotation);
-		XMStoreFloat4(&m_cameraRotation, cameraRotation);
-
-		viewHasChanged = true;
+		m_camera.RotateYaw(-rotationSpeed * m_mouseDeltaX);
+		m_camera.RotatePitch(-rotationSpeed * m_mouseDeltaY);
 	}
 
-	if (viewHasChanged)
-	{
-		XMVECTOR rotationVec = XMLoadFloat4(&m_cameraRotation);
-		XMMATRIX rotationMat = XMMatrixRotationRollPitchYawFromVector(rotationVec);
-		
-		XMVECTOR cameraPosition = XMLoadFloat4(&m_cameraPosition);
-		XMMATRIX translationMat = XMMatrixTranslationFromVector(cameraPosition);
+	XMMATRIX worldMat = XMLoadFloat4x4(&m_worldMat);
 
-		XMMATRIX viewMat = rotationMat * translationMat;
-		viewMat = XMMatrixInverse(nullptr, viewMat);
-		XMStoreFloat4x4(&m_viewMat, viewMat);
-
-		XMMATRIX worldMat = XMLoadFloat4x4(&m_worldMat);
-		XMMATRIX projectionMat = XMLoadFloat4x4(&m_projectionMat);
-
-		XMMATRIX wvpMat = worldMat * viewMat * projectionMat;
-		XMMATRIX wvpMatTransposed = XMMatrixTranspose(wvpMat);
-		XMStoreFloat4x4(&m_wvpData.wvp, wvpMatTransposed);
-	}
+	XMMATRIX wvpMat = worldMat * m_camera.GetViewProjectionMat();
+	XMMATRIX wvpMatTransposed = XMMatrixTranspose(wvpMat);
+	XMStoreFloat4x4(&m_wvpData.wvp, wvpMatTransposed);
 }
 
 void Engine::Init(HWND hwnd)
@@ -979,6 +912,14 @@ void Engine::Update()
 	m_mouseDeltaY = 0.0f;
 }
 
+void Engine::ResizeViewport(UINT resolutionWidth, UINT resolutionHeight)
+{
+	m_resolutionWidth = resolutionWidth;
+	m_resolutionHeight = resolutionHeight;
+	float aspectRatio = static_cast<float>(resolutionWidth) / static_cast<float>(resolutionHeight);
+	m_camera.SetAspectRatio(aspectRatio);
+}
+
 void Engine::Render()
 {
 	// reset command allocator and command list
@@ -1053,6 +994,5 @@ void Engine::Render()
 void Engine::Destroy()
 {
 	CloseHandle(m_fenceEvent);
-	delete[] m_textureData;
 }
 

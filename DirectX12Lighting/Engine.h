@@ -2,11 +2,13 @@
 #include <d3d12.h>
 #include "d3dx12.h"
 #include <wrl.h>
-#include <dxgi1_4.h>	// ?
+#include <dxgi1_4.h>
 #include <d3dcompiler.h>
 #include <DirectXMath.h>
 #include <chrono>
 #include <wincodec.h>
+#include <memory>
+#include "Camera.h"
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -92,18 +94,15 @@ private:
 	UINT8* m_cbWvpGpuAddress[2];
 
 	XMFLOAT4X4 m_worldMat;
-	XMFLOAT4X4 m_viewMat;
-	XMFLOAT4X4 m_projectionMat;
 
 	XMFLOAT4 m_scale;
-	XMFLOAT4 m_position;
-	XMFLOAT4 m_rotation;
+	XMFLOAT4 m_positionVec;
+	XMFLOAT4 m_rotationVec;
 
-	XMFLOAT4 m_cameraPosition;
-	XMFLOAT4 m_cameraRotation;
+	Camera m_camera;
 
 	// textures
-	BYTE* m_textureData;
+	std::unique_ptr<BYTE[]> m_textureData;
 	ComPtr<ID3D12Resource> m_textureDefaultHeap;
 	ComPtr<ID3D12Resource> m_textureUploadHeap;
 	ComPtr<ID3D12DescriptorHeap> m_textureDescriptorHeap;
@@ -133,6 +132,7 @@ public:
 	void Init(HWND hwnd);
 	void Input(float mouseX, float mouseY, bool rightMouseBtnPressed);
 	void Update();
+	void ResizeViewport(UINT resolutionWidth, UINT resolutionHeight);
 	void Render();
 	void Destroy();
 };

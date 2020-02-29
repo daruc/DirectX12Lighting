@@ -5,8 +5,8 @@
 #include <WinUser.h>
 #include <windowsx.h>
 
-UINT g_width = 800;
-UINT g_height = 600;
+const UINT g_width = 800;
+const UINT g_height = 600;
 Engine g_engine(g_width, g_height);
 
 LRESULT CALLBACK wndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -51,10 +51,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
 
 	ShowWindow(hwnd, nCmdShow);
 
-	// Engine
-
 	g_engine.Init(hwnd);
-
 
 	MSG msg = {};
 	while (GetMessage(&msg, NULL, 0, 0))
@@ -79,10 +76,14 @@ LRESULT CALLBACK wndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		return 0;
 	case WM_MOUSEMOVE:
 		{
-			bool rightMouseBtnIsDown = (wParam & 0x0002);
+			const WPARAM rightMouseButtonFlag = 0x0002;
+			bool rightMouseBtnIsDown = (wParam & rightMouseButtonFlag);
 			g_engine.Input(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), rightMouseBtnIsDown);
 			return 0;
 		}
+	case WM_SIZE:
+		g_engine.ResizeViewport(LOWORD(lParam), HIWORD(lParam));
+		return 0;
 	}
 
 	return DefWindowProc(hwnd, uMsg, wParam, lParam);
