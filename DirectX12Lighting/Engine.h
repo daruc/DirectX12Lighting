@@ -26,7 +26,9 @@ using std::chrono::duration;
 
 struct Wvp
 {
+	XMFLOAT4X4 world;
 	XMFLOAT4X4 wvp;
+	XMFLOAT3 cameraPos;
 };
 
 extern const XMVECTOR X_UNIT_VEC;

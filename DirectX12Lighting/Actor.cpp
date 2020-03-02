@@ -32,6 +32,22 @@ void Actor::SetRotation(const XMFLOAT3 * const rotationVec)
 	UpdateTransformationMat();
 }
 
+void Actor::RotateRoll(float radians)
+{
+	float previousRoll = XMVectorGetZ(m_rotationVec);
+	float newRoll = previousRoll + radians;
+	m_rotationVec = XMVectorSetZ(m_rotationVec, newRoll);
+	UpdateTransformationMat();
+}
+
+void Actor::RotateYaw(float radians)
+{
+	float previousYaw = XMVectorGetY(m_rotationVec);
+	float newYaw = previousYaw + radians;
+	m_rotationVec = XMVectorSetY(m_rotationVec, newYaw);
+	UpdateTransformationMat();
+}
+
 void Actor::SetTranslationVec(const XMFLOAT3 * const translationVec)
 {
 	m_translationVec = XMLoadFloat3(translationVec);

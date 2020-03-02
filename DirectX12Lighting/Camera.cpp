@@ -122,6 +122,11 @@ void Camera::MoveUp(float units)
 	UpdateViewMat();
 }
 
+XMVECTOR Camera::GetPosition() const
+{
+	return m_translationVec;
+}
+
 Camera::Camera()
 	: m_translationVec(XMVectorZero()),
 	m_rotationVec(XMVectorZero()),

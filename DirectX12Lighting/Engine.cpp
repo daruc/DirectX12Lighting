@@ -90,7 +90,7 @@ void Engine::CreateRootSignature()
 	// WVP matrix
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[0].Descriptor = rootDescriptor;
-	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 	// texture
 	D3D12_DESCRIPTOR_RANGE descriptorRanges[1];
@@ -161,15 +161,25 @@ void Engine::LoadShaders()
 	UINT compileFlags = 0;
 #endif
 
-	HRESULT hr = D3DCompileFromFile(TEXT("Shaders.hlsl"), nullptr, nullptr, "vsMain", "vs_5_0", compileFlags, 0, &m_vertexShader, nullptr);
+	ComPtr<ID3DBlob> vsErrorMsgs;
+	HRESULT hr = D3DCompileFromFile(
+		TEXT("Shaders.hlsl"), nullptr, nullptr, "vsMain", "vs_5_0", compileFlags, 0, &m_vertexShader, &vsErrorMsgs);
+
 	if (FAILED(hr))
 	{
+		char* errorMsgStr = reinterpret_cast<char*>(vsErrorMsgs->GetBufferPointer());
+		OutputDebugStringA(errorMsgStr);
 		exit(-1);
 	}
 
-	hr = D3DCompileFromFile(TEXT("Shaders.hlsl"), nullptr, nullptr, "psMain", "ps_5_0", compileFlags, 0, &m_pixelShader, nullptr);
+	ComPtr<ID3DBlob> psErrorMsgs;
+	hr = D3DCompileFromFile(
+		TEXT("Shaders.hlsl"), nullptr, nullptr, "psMain", "ps_5_0", compileFlags, 0, &m_pixelShader, &psErrorMsgs);
+
 	if (FAILED(hr))
 	{
+		char* errorMsgStr = reinterpret_cast<char*>(psErrorMsgs->GetBufferPointer());
+		OutputDebugStringA(errorMsgStr);
 		exit(-1);
 	}
 }
@@ -596,8 +606,9 @@ void Engine::CreateConstantBuffers()
 			exit(-1);
 		}
 
-		m_cbWvpUploadHeap[i]->SetName(L"Constant buffer WVP matrix upload heap");
+		m_cbWvpUploadHeap[i]->SetName(L"Constant buffer WVP upload heap");
 
+		// WVP
 		D3D12_CONSTANT_BUFFER_VIEW_DESC cbWvpDesc;
 		cbWvpDesc.BufferLocation = m_cbWvpUploadHeap[i]->GetGPUVirtualAddress();
 		cbWvpDesc.SizeInBytes = (sizeof(Wvp) + 255) & ~255;
@@ -613,7 +624,7 @@ void Engine::CreateConstantBuffers()
 void Engine::InitWvp()
 {
 	// view
-	const XMFLOAT3 cameraPosition = XMFLOAT3(0.0f, 0.0f, -300.0f);
+	const XMFLOAT3 cameraPosition = XMFLOAT3(0.0f, 0.0f, -150.0f);
 	m_camera.SetTranslation(&cameraPosition);
 
 	// projection
@@ -627,7 +638,9 @@ void Engine::InitWvp()
 	XMMATRIX wvpMat = m_actor.GetWorldMat() * m_camera.GetViewProjectionMat();
 	XMMATRIX wvpTransposedMat = XMMatrixTranspose(wvpMat);
 
+	XMStoreFloat4x4(&m_wvpData.world, m_actor.GetWorldMat());
 	XMStoreFloat4x4(&m_wvpData.wvp, wvpTransposedMat);
+	XMStoreFloat3(&m_wvpData.cameraPos, m_camera.GetPosition());
 }
 
 void Engine::UpdateWvp(float deltaSec)
@@ -657,15 +670,40 @@ void Engine::UpdateWvp(float deltaSec)
 		m_camera.MoveRight(movementSpeed * deltaSec);
 	}
 
+	if (GetKeyState(((int) 'Q')) & keyStatePressedFlag)
+	{
+		m_actor.RotateRoll(-deltaSec);
+	}
+
+	if (GetKeyState(((int) 'E')) & keyStatePressedFlag)
+	{
+		m_actor.RotateRoll(deltaSec);
+	}
+
+	if (GetKeyState(((int) 'Z')) & keyStatePressedFlag)
+	{
+		m_actor.RotateYaw(-deltaSec);
+	}
+
+	if (GetKeyState(((int) 'C')) & keyStatePressedFlag)
+	{
+		m_actor.RotateYaw(deltaSec);
+	}
+
 	if (m_mouseDeltaX != 0.0f || m_mouseDeltaY != 0.0f)
 	{
 		m_camera.RotateYaw(-rotationSpeed * m_mouseDeltaX);
 		m_camera.RotatePitch(-rotationSpeed * m_mouseDeltaY);
 	}
 
+	//m_actor.RotateRoll(deltaSec);
+
 	XMMATRIX wvpMat = m_actor.GetWorldMat() * m_camera.GetViewProjectionMat();
 	XMMATRIX wvpMatTransposed = XMMatrixTranspose(wvpMat);
+
+	XMStoreFloat4x4(&m_wvpData.world, m_actor.GetWorldMat());
 	XMStoreFloat4x4(&m_wvpData.wvp, wvpMatTransposed);
+	XMStoreFloat3(&m_wvpData.cameraPos, m_camera.GetPosition());
 }
 
 void Engine::Init(HWND hwnd)
@@ -879,12 +917,9 @@ void Engine::Render()
 	m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
 
 	// constant buffer descriptor heap
-	ID3D12DescriptorHeap* descriptorHeaps[] = { m_cbDescriptorHeap[m_frameIndex].Get() };
+	ID3D12DescriptorHeap* descriptorHeaps[] = { m_textureDescriptorHeap.Get() };
 	m_commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 	m_commandList->SetGraphicsRootConstantBufferView(0, m_cbWvpUploadHeap[m_frameIndex]->GetGPUVirtualAddress());
-
-	descriptorHeaps[0] = m_textureDescriptorHeap.Get();
-	m_commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 	m_commandList->SetGraphicsRootDescriptorTable(1, m_textureDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
 	m_commandList->RSSetViewports(1, &m_viewport);
@@ -921,5 +956,6 @@ void Engine::Render()
 void Engine::Destroy()
 {
 	CloseHandle(m_fenceEvent);
+	m_actor.ClearObj();
 }
 

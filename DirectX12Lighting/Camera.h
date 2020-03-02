@@ -34,6 +34,7 @@ public:
 	void MoveForward(float units);
 	void MoveRight(float units);
 	void MoveUp(float units);
+	XMVECTOR GetPosition() const;
 
 	Camera();
 	XMMATRIX GetViewProjectionMat() const;
