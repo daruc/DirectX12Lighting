@@ -1,4 +1,4 @@
-![alt text](https://github.com/daruc/DirectX12Ligtning/screenshot.png "Screenshot")
+![alt text](https://github.com/daruc/DirectX12Lighting/blob/master/screenshot.png"Screenshot")
 
 ### Requirements
 * directxmesh_desktop_win10.2020.2.15.2
