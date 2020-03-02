@@ -1,4 +1,7 @@
 #pragma once
+
+#define NOMINMAX
+
 #include <d3d12.h>
 #include "d3dx12.h"
 #include <wrl.h>
@@ -9,6 +12,7 @@
 #include <wincodec.h>
 #include <memory>
 #include "Camera.h"
+#include "Actor.h"
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -20,31 +24,18 @@ using namespace DirectX;
 using std::chrono::high_resolution_clock;
 using std::chrono::duration;
 
-struct Vertex
-{
-	XMFLOAT3 pos;
-	XMFLOAT2 texCoord;
-
-	Vertex(float x, float y, float z, float u, float v)
-		: pos(x, y, z), texCoord(u, v)
-	{
-	}
-};
-
-struct ColorMultiplier
-{
-	XMFLOAT4 colorMultiplier;
-};
-
 struct Wvp
 {
 	XMFLOAT4X4 wvp;
 };
 
+extern const XMVECTOR X_UNIT_VEC;
+extern const XMVECTOR Y_UNIT_VEC;
+extern const XMVECTOR Z_UNIT_VEC;
+
 class Engine
 {
 private:
-
 	UINT m_resolutionWidth;
 	UINT m_resolutionHeight;
 	HWND m_hwnd;
@@ -93,12 +84,7 @@ private:
 	Wvp m_wvpData;
 	UINT8* m_cbWvpGpuAddress[2];
 
-	XMFLOAT4X4 m_worldMat;
-
-	XMFLOAT4 m_scale;
-	XMFLOAT4 m_positionVec;
-	XMFLOAT4 m_rotationVec;
-
+	Actor m_actor;
 	Camera m_camera;
 
 	// textures
@@ -126,6 +112,7 @@ private:
 	void CreateConstantBuffers();
 
 public:
+
 	Engine(UINT resolutionWidth, UINT resolutionHeight);
 	~Engine();
 

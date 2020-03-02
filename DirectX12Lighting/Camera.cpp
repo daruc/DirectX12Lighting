@@ -1,9 +1,10 @@
 #include "Camera.h"
+#include "Engine.h"
 
 void Camera::UpdateViewMat()
 {
 	XMMATRIX rotationMat = XMMatrixRotationRollPitchYawFromVector(m_rotationVec);
-	XMMATRIX translationMat = XMMatrixTranslationFromVector(m_positionVec);
+	XMMATRIX translationMat = XMMatrixTranslationFromVector(m_translationVec);
 	m_viewMat = rotationMat * translationMat;
 }
 
@@ -15,30 +16,30 @@ void Camera::UpdateProjectionMat()
 XMVECTOR Camera::CalculateForwardVec()
 {
 	XMMATRIX rotationMat = XMMatrixRotationRollPitchYawFromVector(m_rotationVec);
-	return XMVector4Transform(m_Z_UNIT_VEC, rotationMat);
+	return XMVector4Transform(Z_UNIT_VEC, rotationMat);
 }
 
 XMVECTOR Camera::CalculateRightVec()
 {
 	XMMATRIX rotationMat = XMMatrixRotationRollPitchYawFromVector(m_rotationVec);
-	return XMVector4Transform(m_X_UNIT_VEC, rotationMat);
+	return XMVector4Transform(X_UNIT_VEC, rotationMat);
 }
 
 XMVECTOR Camera::CalculateUpVec()
 {
 	XMMATRIX rotationMat = XMMatrixRotationRollPitchYawFromVector(m_rotationVec);
-	return XMVector4Transform(m_Y_UNIT_VEC, rotationMat);
+	return XMVector4Transform(Y_UNIT_VEC, rotationMat);
 }
 
-void Camera::SetPosition(const XMFLOAT4 * const position)
+void Camera::SetTranslation(const XMFLOAT3 * const position)
 {
-	m_positionVec = XMLoadFloat4(position);
+	m_translationVec = XMLoadFloat3(position);
 	UpdateViewMat();
 }
 
-void Camera::SetRotation(const XMFLOAT4 * const rotation)
+void Camera::SetRotation(const XMFLOAT3 * const rotation)
 {
-	m_rotationVec = XMLoadFloat4(rotation);
+	m_rotationVec = XMLoadFloat3(rotation);
 	UpdateViewMat();
 }
 
@@ -87,13 +88,13 @@ void Camera::RotateYaw(float radians)
 	float previousYaw = XMVectorGetY(m_rotationVec);
 	float newYaw = previousYaw - radians;
 
-	if (newYaw > XM_PI)
+	if (newYaw > XM_2PI)
 	{
-		newYaw = XM_PI;
+		newYaw -= XM_2PI;
 	}
-	else if (newYaw < -XM_PI)
+	else if (newYaw < -XM_2PI)
 	{
-		newYaw = -XM_PI;
+		newYaw += XM_2PI;
 	}
 
 	m_rotationVec = XMVectorSetY(m_rotationVec, newYaw);
@@ -103,35 +104,27 @@ void Camera::RotateYaw(float radians)
 void Camera::MoveForward(float units)
 {
 	XMVECTOR translationVec = CalculateForwardVec() * units;
-	m_positionVec += translationVec;
+	m_translationVec += translationVec;
 	UpdateViewMat();
 }
 
 void Camera::MoveRight(float units)
 {
 	XMVECTOR translationVec = CalculateRightVec() * units;
-	m_positionVec += translationVec;
+	m_translationVec += translationVec;
 	UpdateViewMat();
 }
 
 void Camera::MoveUp(float units)
 {
 	XMVECTOR translationVec = CalculateUpVec() * units;
-	m_positionVec += translationVec;
+	m_translationVec += translationVec;
 	UpdateViewMat();
 }
 
 Camera::Camera()
-	: m_positionVec(XMVectorZero()),
+	: m_translationVec(XMVectorZero()),
 	m_rotationVec(XMVectorZero()),
-
-	m_X_UNIT_VEC_FLOAT(1.0f, 0.0f, 0.0f, 0.0f),
-	m_Y_UNIT_VEC_FLOAT(0.0f, 1.0f, 0.0f, 0.0f),
-	m_Z_UNIT_VEC_FLOAT(0.0f, 0.0f, 1.0f, 0.0f),
-
-	m_X_UNIT_VEC(XMLoadFloat4(&m_X_UNIT_VEC_FLOAT)),
-	m_Y_UNIT_VEC(XMLoadFloat4(&m_Y_UNIT_VEC_FLOAT)),
-	m_Z_UNIT_VEC(XMLoadFloat4(&m_Z_UNIT_VEC_FLOAT)),
 
 	m_NEAR_Z(0.1f),
 	m_FAR_Z(1000.0f),
@@ -141,7 +134,7 @@ Camera::Camera()
 {
 }
 
-XMMATRIX Camera::GetViewProjectionMat()
+XMMATRIX Camera::GetViewProjectionMat() const
 {
 	return XMMatrixInverse(nullptr, m_viewMat) * m_projectionMat;
 }

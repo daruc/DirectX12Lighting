@@ -1,13 +1,15 @@
 struct VS_INPUT
 {
 	float3 pos : POSITION;
-	float4 texCoord : TEX_COORD;
+	float3 normal: NORMAL;
+	float2 texCoord : TEXCOORD;
 };
 
 struct VS_OUTPUT
 {
 	float4 pos : SV_POSITION;
-	float4 texCoord : TEX_COORD;
+	float3 normal : NORMAL;
+	float2 texCoord : TEXCOORD;
 };
 
 cbuffer WvpConstantBuffer : register(b0)
@@ -24,6 +26,7 @@ VS_OUTPUT vsMain(VS_INPUT input)
 	VS_OUTPUT output;
 	output.pos = float4(input.pos, 1.0f);
 	output.pos = mul(output.pos, wvp);
+	output.normal = input.normal;
 	output.texCoord = input.texCoord;
 
 	return output;
@@ -33,4 +36,5 @@ VS_OUTPUT vsMain(VS_INPUT input)
 float4 psMain(VS_OUTPUT input) : SV_TARGET
 {
 	return tex.Sample(samplerState, input.texCoord);
+	//return float4(0.0f, 0.0f, 1.0f, 1.0f);
 }

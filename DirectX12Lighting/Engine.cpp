@@ -3,6 +3,13 @@
 #include <iostream>
 #include "Engine.h"
 
+const XMFLOAT3 X_UNIT_VEC_FLOAT = XMFLOAT3(1.0f, 0.0f, 0.0f);
+const XMFLOAT3 Y_UNIT_VEC_FLOAT = XMFLOAT3(0.0f, 1.0f, 0.0f);
+const XMFLOAT3 Z_UNIT_VEC_FLOAT = XMFLOAT3(0.0f, 0.0f, 1.0f);
+
+const XMVECTOR X_UNIT_VEC = XMLoadFloat3(&X_UNIT_VEC_FLOAT);
+const XMVECTOR Y_UNIT_VEC = XMLoadFloat3(&Y_UNIT_VEC_FLOAT);
+const XMVECTOR Z_UNIT_VEC = XMLoadFloat3(&Z_UNIT_VEC_FLOAT);
 
 Engine::Engine(UINT resolutionWidth, UINT resolutionHeight)
 	: m_resolutionWidth(resolutionWidth), m_resolutionHeight(resolutionHeight)
@@ -187,7 +194,7 @@ void Engine::LoadTextures()
 	IWICBitmapDecoder* bitmapDecoder = nullptr;	// TODO: release
 
 	hr = imagingFactory->CreateDecoderFromFilename(
-		TEXT("cube_tex.png"),
+		TEXT("ATV\\ATV_tex.png"),
 		nullptr,
 		GENERIC_READ,
 		WICDecodeMetadataCacheOnDemand,
@@ -335,7 +342,8 @@ void Engine::CreatePipelineStateObject()
 	D3D12_INPUT_ELEMENT_DESC inputLayout[] =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "TEX_COORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
 	};
 
 	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = {};
@@ -379,46 +387,10 @@ void Engine::CreatePipelineStateObject()
 
 void Engine::CreateVertexBuffer()
 {
-	Vertex vList[] = {
+	m_actor.LoadObjFromFile(TEXT("ATV\\ATV.obj"));
 
-		// front
-		{ -0.5f,  0.5f, -0.5f, 0.0f, 0.0f },
-		{  0.5f, -0.5f, -0.5f, 1.0f, 1.0f },
-		{ -0.5f, -0.5f, -0.5f, 0.0f, 1.0f },
-		{  0.5f,  0.5f, -0.5f, 1.0f, 0.0f },
-
-		// right
-		{  0.5f, -0.5f, -0.5f, 0.0f, 1.0f },
-		{  0.5f,  0.5f,  0.5f, 1.0f, 0.0f },
-		{  0.5f, -0.5f,  0.5f, 1.0f, 1.0f },
-		{  0.5f,  0.5f, -0.5f, 0.0f, 0.0f },
-
-		// left
-		{ -0.5f,  0.5f,  0.5f, 0.0f, 0.0f },
-		{ -0.5f, -0.5f, -0.5f, 1.0f, 1.0f },
-		{ -0.5f, -0.5f,  0.5f, 0.0f, 1.0f },
-		{ -0.5f,  0.5f, -0.5f, 1.0f, 0.0f },
-
-		// back
-		{  0.5f,  0.5f,  0.5f, 0.0f, 0.0f },
-		{ -0.5f, -0.5f,  0.5f, 1.0f, 1.0f },
-		{  0.5f, -0.5f,  0.5f, 0.0f, 1.0f },
-		{ -0.5f,  0.5f,  0.5f, 1.0f, 0.0f },
-
-		// top
-		{ -0.5f,  0.5f, -0.5f, 0.0f, 1.0f },
-		{  0.5f,  0.5f,  0.5f, 1.0f, 0.0f },
-		{  0.5f,  0.5f, -0.5f, 1.0f, 1.0f },
-		{ -0.5f,  0.5f,  0.5f, 0.0f, 0.0f },
-
-		// bottom
-		{  0.5f, -0.5f,  0.5f, 0.0f, 0.0f },
-		{ -0.5f, -0.5f, -0.5f, 1.0f, 1.0f },
-		{  0.5f, -0.5f, -0.5f, 0.0f, 1.0f },
-		{ -0.5f, -0.5f,  0.5f, 1.0f, 0.0f }
-	};
-
-	int vBufferSize = sizeof(vList);
+	std::vector<WaveFrontReader<DWORD>::Vertex>& verticles = m_actor.GetVerticles();
+	int vBufferSize = verticles.size() * sizeof(WaveFrontReader<DWORD>::Vertex);
 
 	// create default heap - memory on GPU. Only GPU has access to it.
 	HRESULT hr = m_device->CreateCommittedResource(
@@ -454,42 +426,16 @@ void Engine::CreateVertexBuffer()
 
 	// store vertex buffer in upload heap
 	D3D12_SUBRESOURCE_DATA vertexData = {};
-	vertexData.pData = reinterpret_cast<BYTE*>(vList);
-	vertexData.RowPitch = vBufferSize;
-	vertexData.SlicePitch = vBufferSize;
+	vertexData.pData = reinterpret_cast<BYTE*>(&verticles[0]);
+	vertexData.RowPitch = verticles.size();
+	vertexData.SlicePitch = verticles.size();
 
 	// copy from upload heap to default heap
 	UpdateSubresources(m_commandList.Get(), m_vertexBuffer.Get(), m_vBufferUploadHeap.Get(), 0, 0, 1, &vertexData);
 	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_vertexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
 
 	// index buffer
-	DWORD iList[] = {
-		// front
-		0, 1, 2,
-		0, 3, 1,
-
-		// left
-		4, 5, 6,
-		4, 7, 5,
-
-		// right
-		8, 9, 10,
-		8, 11, 9,
-
-		// back
-		12, 13, 14,
-		12, 15, 13,
-
-		// top
-		16, 17, 18,
-		16, 19, 17,
-
-		// bottom
-		20, 21, 22,
-		20, 23, 21
-	};
-
-	int iBufferSize = sizeof(iList);
+	UINT iBufferSize = m_actor.GetIndices().size() * sizeof(DWORD);
 
 	// create deafult heap
 	hr = m_device->CreateCommittedResource(
@@ -522,7 +468,7 @@ void Engine::CreateVertexBuffer()
 
 	// store index data in upload heap
 	D3D12_SUBRESOURCE_DATA indexData = {};
-	indexData.pData = reinterpret_cast<BYTE*>(iList);
+	indexData.pData = reinterpret_cast<BYTE*>(&m_actor.GetIndices()[0]);
 	indexData.RowPitch = iBufferSize;
 	indexData.SlicePitch = iBufferSize;
 
@@ -591,7 +537,7 @@ void Engine::CreateVertexBuffer()
 
 	// create vertex buffer view
 	m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
-	m_vertexBufferView.StrideInBytes = sizeof(Vertex);
+	m_vertexBufferView.StrideInBytes = sizeof(WaveFrontReader<DWORD>::Vertex);
 	m_vertexBufferView.SizeInBytes = vBufferSize;
 
 	// create index buffer view
@@ -666,26 +612,9 @@ void Engine::CreateConstantBuffers()
 
 void Engine::InitWvp()
 {
-	// world
-	m_scale = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.0f);
-	m_positionVec = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
-	m_rotationVec = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
-
-	XMVECTOR scale = XMLoadFloat4(&m_scale);
-	XMVECTOR position = XMLoadFloat4(&m_positionVec);
-	XMVECTOR rotation = XMLoadFloat4(&m_rotationVec);
-
-	XMMATRIX scaleMat = XMMatrixScalingFromVector(scale);
-	XMMATRIX positionMat = XMMatrixTranslationFromVector(position);
-	XMMATRIX rotationMat = XMMatrixRotationRollPitchYawFromVector(rotation);
-
-	XMMATRIX worldMat = scaleMat * positionMat * rotationMat;
-
-	XMStoreFloat4x4(&m_worldMat, worldMat);
-
 	// view
-	const XMFLOAT4 cameraPosition = XMFLOAT4(0.0f, 0.0f, -3.0f, 0.0f);
-	m_camera.SetPosition(&cameraPosition);
+	const XMFLOAT3 cameraPosition = XMFLOAT3(0.0f, 0.0f, -300.0f);
+	m_camera.SetTranslation(&cameraPosition);
 
 	// projection
 	const float fov = 60.0f * (XM_PI / 180.0f);
@@ -695,7 +624,7 @@ void Engine::InitWvp()
 	m_camera.SetAspectRatio(aspectRatio);
 
 	// World-View-Projection matrix
-	XMMATRIX wvpMat = worldMat * m_camera.GetViewProjectionMat();
+	XMMATRIX wvpMat = m_actor.GetWorldMat() * m_camera.GetViewProjectionMat();
 	XMMATRIX wvpTransposedMat = XMMatrixTranspose(wvpMat);
 
 	XMStoreFloat4x4(&m_wvpData.wvp, wvpTransposedMat);
@@ -703,7 +632,7 @@ void Engine::InitWvp()
 
 void Engine::UpdateWvp(float deltaSec)
 {
-	const float movementSpeed = 1.0f;
+	const float movementSpeed = 50.0f;
 	const float rotationSpeed = 0.005f;
 	const SHORT keyStatePressedFlag = 0x800;
 	bool viewHasChanged = false;
@@ -734,9 +663,7 @@ void Engine::UpdateWvp(float deltaSec)
 		m_camera.RotatePitch(-rotationSpeed * m_mouseDeltaY);
 	}
 
-	XMMATRIX worldMat = XMLoadFloat4x4(&m_worldMat);
-
-	XMMATRIX wvpMat = worldMat * m_camera.GetViewProjectionMat();
+	XMMATRIX wvpMat = m_actor.GetWorldMat() * m_camera.GetViewProjectionMat();
 	XMMATRIX wvpMatTransposed = XMMatrixTranspose(wvpMat);
 	XMStoreFloat4x4(&m_wvpData.wvp, wvpMatTransposed);
 }
@@ -965,7 +892,7 @@ void Engine::Render()
 	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
 	m_commandList->IASetIndexBuffer(&m_indexBufferView);
-	m_commandList->DrawIndexedInstanced(36, 1, 0, 0, 0);
+	m_commandList->DrawIndexedInstanced(m_actor.GetIndices().size(), 1, 0, 0, 0);
 
 	// indicate that the back buffer will be used to present
 	m_commandList->ResourceBarrier(1, 

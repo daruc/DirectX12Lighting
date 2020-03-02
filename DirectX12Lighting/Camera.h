@@ -1,4 +1,5 @@
 #pragma once
+
 #include <DirectXMath.h>
 
 using namespace DirectX;
@@ -6,18 +7,10 @@ using namespace DirectX;
 class Camera
 {
 private:
-	const XMFLOAT4 m_X_UNIT_VEC_FLOAT;
-	const XMFLOAT4 m_Y_UNIT_VEC_FLOAT;
-	const XMFLOAT4 m_Z_UNIT_VEC_FLOAT;
-
-	const XMVECTOR m_X_UNIT_VEC;
-	const XMVECTOR m_Y_UNIT_VEC;
-	const XMVECTOR m_Z_UNIT_VEC;
-
 	const float m_NEAR_Z;
 	const float m_FAR_Z;
 
-	XMVECTOR m_positionVec;
+	XMVECTOR m_translationVec;
 	XMVECTOR m_rotationVec;
 	XMMATRIX m_viewMat;
 
@@ -32,8 +25,8 @@ private:
 	XMVECTOR CalculateUpVec();
 
 public:
-	void SetPosition(const XMFLOAT4* const position);
-	void SetRotation(const XMFLOAT4* const rotation);
+	void SetTranslation(const XMFLOAT3* const position);
+	void SetRotation(const XMFLOAT3* const rotation);
 	void SetFov(float fov);
 	void SetAspectRatio(float aspectRatio);
 	void RotatePitch(float radians);
@@ -43,6 +36,6 @@ public:
 	void MoveUp(float units);
 
 	Camera();
-	XMMATRIX GetViewProjectionMat();
+	XMMATRIX GetViewProjectionMat() const;
 };
 
